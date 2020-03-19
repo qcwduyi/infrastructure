@@ -20,7 +20,7 @@
 
         "ImageID": {
             "Type": "String"
-           
+
         },
 
         "InstanceType": {
@@ -372,7 +372,6 @@
 
         "WebAppS3Policies": {
             "Type": "AWS::IAM::Policy",
-            "DependsOn": ["S3Bucket", "EC2CSYE6225Role"],
             "Properties": {
                 "PolicyName": "WebAppS3",
                 "PolicyDocument": {
@@ -520,6 +519,8 @@
                     } ]
                 },
                 "ManagedPolicyArns":[
+                    "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy",
+                    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
                     {"Ref" : "CodeDeployEC2S3"}
                 ],
                 "Path": "/",
