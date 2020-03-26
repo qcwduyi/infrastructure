@@ -8,8 +8,9 @@
             "Type": "String"
         },
 
-        "HostedZoneName": {
-            "Type": "String"
+        "HostedZoneId": {
+            "Type": "String",
+            "Default": "Z06954381VIO4GNQVR4AQ"
         },
         "CertificateARN": {
             "Type": "String",
@@ -826,8 +827,8 @@
                 "Name": {
                     "Ref" : "Rout53Name"
                 },
-                "HostedZoneName": {
-                    "Ref" : "HostedZoneName"
+                "HostedZoneId": {
+                    "Ref" : "HostedZoneId"
                 },
                 "Type": "A"
             }
