@@ -291,6 +291,7 @@
                 "MultiAZ": {"Ref": "MultiAZ"},
                 "PubliclyAccessible": {"Ref": "PubliclyAccessible"},
                 "DBSubnetGroupName": {"Ref":"DBSubnetGrp"},
+                "StorageEncrypted": true,
                 "VPCSecurityGroups": [
                     {"Ref": "SecurityGroupForDB"}
                 ],
@@ -392,6 +393,58 @@
             }
         },
 
+        "EC2Policy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "EC2Policy",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ec2:AttachVolume",
+                                "ec2:AuthorizeSecurityGroupIngress",
+                                "ec2:CopyImage",
+                                "ec2:CreateImage",
+                                "ec2:CreateKeypair",
+                                "ec2:CreateSecurityGroup",
+                                "ec2:CreateSnapshot",
+                                "ec2:CreateTags",
+                                "ec2:CreateVolume",
+                                "ec2:DeleteKeyPair",
+                                "ec2:DeleteSecurityGroup",
+                                "ec2:DeleteSnapshot",
+                                "ec2:DeleteVolume",
+                                "ec2:DeregisterImage",
+                                "ec2:DescribeImageAttribute",
+                                "ec2:DescribeImages",
+                                "ec2:DescribeInstances",
+                                "ec2:DescribeInstanceStatus",
+                                "ec2:DescribeRegions",
+                                "ec2:DescribeSecurityGroups",
+                                "ec2:DescribeSnapshots",
+                                "ec2:DescribeSubnets",
+                                "ec2:DescribeTags",
+                                "ec2:DescribeVolumes",
+                                "ec2:DetachVolume",
+                                "ec2:GetPasswordData",
+                                "ec2:ModifyImageAttribute",
+                                "ec2:ModifyInstanceAttribute",
+                                "ec2:ModifySnapshotAttribute",
+                                "ec2:RegisterImage",
+                                "ec2:RunInstances",
+                                "ec2:StopInstances",
+                                "ec2:TerminateInstances"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Users" : [ { "Ref" : "TestUser" } ]
+            }
+        },
+
 
         "CodeDeployEC2S3" : {
             "Type" : "AWS::IAM::ManagedPolicy",
@@ -486,6 +539,7 @@
         },
 
 
+
         "CodeDeployServiceRole": {
             "Type": "AWS::IAM::Role",
             "Properties": {
@@ -527,7 +581,8 @@
                     "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
                     "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
                     "arn:aws:iam::aws:policy/AmazonSESFullAccess",
-                    "arn:aws:iam::aws:policy/AWSLambdaFullAccess"
+                    "arn:aws:iam::aws:policy/AWSLambdaFullAccess",
+                    "arn:aws:iam::aws:policy/AmazonS3FullAccess"
                 ],
                 "Path": "/",
                 "RoleName": "CodeDeployEC2ServiceRole"
@@ -595,7 +650,7 @@
             "Type":"AWS::AutoScaling::LaunchConfiguration",
             "Properties":{
                 "ImageId" :{"Ref" : "ImageID"},
-                "KeyName": "csye6225Key",
+                "KeyName": "awsKey",
                 "InstanceType":"t2.micro",
                 "IamInstanceProfile" : {"Ref" : "CodeDeployEC2ServiceInstanceProfile"},
                 "AssociatePublicIpAddress":true,
@@ -661,6 +716,7 @@
                 "SecurityGroupIngress": [
                     {"IpProtocol" : "tcp", "FromPort" : 22, "ToPort" : 22, "CidrIp": "0.0.0.0/0"},
                     {"IpProtocol" : "tcp", "FromPort" : 443, "ToPort" : 443, "CidrIp": "0.0.0.0/0"},
+                    {"IpProtocol" : "tcp", "FromPort" : 80, "ToPort" : 80, "CidrIp": "0.0.0.0/0"},
                     {"IpProtocol" : "tcp", "FromPort" : 8080, "ToPort" : 8080, "SourceSecurityGroupId" : {"Ref":"LoadbalancerSecurityGroup"}}
 
                 ]
@@ -802,7 +858,7 @@
                 "GroupDescription":"Security Group for Load Balancers",
                 "VpcId" : {"Ref": "DemoVPC"},
                 "SecurityGroupIngress":[
-                    {"IpProtocol" : "tcp", "FromPort" : 80, "ToPort" : 80, "CidrIp": "0.0.0.0/0"}
+                    {"IpProtocol" : "tcp", "FromPort" : 443, "ToPort" : 443, "CidrIp": "0.0.0.0/0"}
                 ] ,
 
                 "Tags":[
@@ -814,18 +870,23 @@
             }
         },
 
-        "ALBListener" : {
+
+        "ALBListenerForHttps" : {
             "Type" : "AWS::ElasticLoadBalancingV2::Listener",
             "DependsOn":["ALBTargetGroup","ALBLoadBalancer"],
             "Properties" : {
-
+                "Certificates": [
+                    {
+                        "CertificateArn": "arn:aws:acm:us-east-1:352551683185:certificate/69db99e0-b77f-4581-8696-512a6fa9c86d"
+                    }
+                ],
                 "DefaultActions" : [{
                     "Type" : "forward",
                     "TargetGroupArn" : { "Ref" : "ALBTargetGroup" }
                 }],
                 "LoadBalancerArn" : { "Ref" : "ALBLoadBalancer" },
-                "Port" : 80,
-                "Protocol" : "HTTP"
+                "Port" : 443,
+                "Protocol" : "HTTPS"
 
             }
         },
@@ -847,127 +908,8 @@
                 },
                 "Type": "A"
             }
-        },
-
-        "MyTopic": {
-            "Type" : "AWS::SNS::Topic",
-            "Properties" : {
-                "DisplayName" : "My topic",
-                "Subscription" : [
-                    {
-                        "Endpoint" : {"Fn::GetAtt": [ "LambdaFunction", "Arn" ] },
-                        "Protocol" : "lambda"
-                    }
-                ],
-                "TopicName" : "MyTopic"
-            }
-        },
-
-        "LambdaFunction":{
-            "DependsOn":["LamdaSNSExecutionRole"],
-            "Type" : "AWS::Lambda::Function",
-            "Properties" : {
-                "Code" : {
-                    "S3Bucket": "codedeploy.qingc.me",
-                    "S3Key": "serverless-1.0-SNAPSHOT.jar"
-                },
-                "FunctionName": "myFunction",
-                "Description" : "SendDuebillEmail",
-                "Handler" : "lambda.Handler::handleRequest",
-                "Role" : {"Fn::GetAtt": [ "LamdaSNSExecutionRole", "Arn" ] },
-                "Runtime" : "java8",
-                "Timeout" : "60",
-                "MemorySize" : 256
-            }
-        },
-
-        "LamdaSNSExecutionRole":{
-            "Type": "AWS::IAM::Role",
-            "Properties": {
-                "RoleName":"LamdaSNSExecutionRole",
-                "AssumeRolePolicyDocument": {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Sid": "",
-                            "Effect": "Allow",
-                            "Principal": {
-                                "Service": [
-                                    "lambda.amazonaws.com"
-                                ]
-                            },
-                            "Action": "sts:AssumeRole"
-                        }
-                    ]
-                },
-                "ManagedPolicyArns":["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-                    "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
-                    "arn:aws:iam::aws:policy/AmazonSESFullAccess"
-                ],
-                "Path": "/"
-            }
-        },
-
-        "TopicPolicy":{
-            "DependsOn" : "MyTopic",
-            "Type": "AWS::SNS::TopicPolicy",
-            "Properties":{
-                "Topics":[{"Ref":"MyTopic"}],
-                "PolicyDocument":{
-                    "Version": "2012-10-17",
-                    "Statement":
-                    [{
-                        "Effect": "Allow",
-                        "Action": ["sns:Publish"],
-                        "Resource": {"Ref":"MyTopic"},
-                        "Principal": {
-                            "AWS": "*"
-                        }
-                    }
-                    ]}
-            }
-        },
-
-        "LambdaResourcePolicy": {
-            "DependsOn":["LambdaFunction","MyTopic"],
-            "Type": "AWS::Lambda::Permission",
-            "Properties": {
-                "FunctionName" : { "Ref" : "LambdaFunction" },
-                "Principal": "sns.amazonaws.com",
-                "Action": "lambda:InvokeFunction",
-                "SourceArn" : { "Ref" : "MyTopic" }
-            }
-        },
-
-        "DynamoDBTable":{
-            "Type" : "AWS::DynamoDB::Table",
-            "Properties" : {
-                "KeySchema" : [ {
-                    "AttributeName" : "Email",
-                    "KeyType" : "HASH"
-                },
-                    {
-                        "AttributeName" : "Token",
-                        "KeyType" : "RANGE"
-                    } ],
-                "BillingMode":"PAY_PER_REQUEST",
-                "TableName" : "DynamoDBForLambda",
-                "AttributeDefinitions" : [ {
-                    "AttributeName" : "Email",
-                    "AttributeType" : "S"
-                },
-                    {
-                        "AttributeName" : "Token",
-                        "AttributeType" : "S"
-                    }],
-                "TimeToLiveSpecification":
-                {
-                    "AttributeName" : "ttl",
-                    "Enabled" : "true"
-                }
-
-            }
         }
+
 
     }
 }
